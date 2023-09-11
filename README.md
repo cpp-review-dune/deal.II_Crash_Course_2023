@@ -1,4 +1,4 @@
-## [![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://github.com/cpp-review-dune/deal.II_Crash_Course_2023)
+## [![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io#/https://github.com/cpp-review-dune/deal.II_Crash_Course_2023)
 
 # deal.II Crash Course of the 10th deal.II Users and Developers Workshop
 
