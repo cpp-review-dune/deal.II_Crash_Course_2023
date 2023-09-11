@@ -89,7 +89,7 @@ Poisson::Poisson()
 void Poisson::make_grid()
 {
   /* MISSING CODE: Use GridGenerator to generate quadratic mesh*/
-  
+  GridGenerator::hyper_cube(triangulation, -1, 1);
   triangulation.refine_global(5);
  
   std::cout << "Number of active cells: " << triangulation.n_active_cells()
@@ -123,6 +123,7 @@ void Poisson::assemble_system()
 
   FEValues<2> fe_values(fe,
                         quadrature_formula,
+                        update_values | update_gradients | update_JxW_values
                         /* MISSING CODE: Which information is needed for the assembly? */);
  
   const unsigned int dofs_per_cell = fe.n_dofs_per_cell();
@@ -140,6 +141,8 @@ void Poisson::assemble_system()
       Reset the local cell's contributions (cell_matrix and cell_rhs)
       to global matrix (cell_matrix) and global rhs
       */
+      cell_matrix = 0;
+      cell_rhs    = 0;
  
       for (const unsigned int q_index : fe_values.quadrature_point_indices())
         {
@@ -149,25 +152,36 @@ void Poisson::assemble_system()
                 /* MISSING CODE:
                 Assemble: grad phi_i(x_q) * grad phi_j(x_q) * dx
                 */
+                cell_matrix(i, j) +=
+                (fe_values.shape_grad(i, q_index) * // grad phi_i(x_q)
+                 fe_values.shape_grad(j, q_index) * // grad phi_j(x_q)
+                 fe_values.JxW(q_index));           // dx
 
  
           // system rhs
           for (const unsigned int i : fe_values.dof_indices())
               /* MISSING CODE:
               Assemble: phi_i(x_q) * f(x_q) * dx
-              */            
+              */
+              cell_rhs(i) += (fe_values.shape_value(i, q_index) * // phi_i(x_q)
+                            1. *                                // f(x_q)
+                            fe_values.JxW(q_index));            // dx            
         }
 
       // transfer the local elements to the global matrix.
       cell->get_dof_indices(local_dof_indices);
       for (const unsigned int i : fe_values.dof_indices())
         for (const unsigned int j : fe_values.dof_indices())
-          system_matrix.add(/* MISSING CODE: ADD local to global*/);
+          system_matrix.add(/* MISSING CODE: ADD local to global*/
+        local_dof_indices[i],
+                            local_dof_indices[j],
+                            cell_matrix(i, j));
 
 
  
       for (const unsigned int i : fe_values.dof_indices())
         /* MISSING CODE: ADD local to global*/
+      system_rhs(local_dof_indices[i]) += cell_rhs(i);
     }
  
  
@@ -178,7 +192,7 @@ void Poisson::assemble_system()
   std::map<types::global_dof_index, double> boundary_values;
   VectorTools::interpolate_boundary_values(dof_handler,
                                            0,
-                                           /* Missing Code: Set zero Dirichlet BC*/,
+                                           Functions::ZeroFunction<2>()/* Missing Code: Set zero Dirichlet BC*/,
                                            boundary_values);
   MatrixTools::apply_boundary_values(boundary_values,
                                      system_matrix,
@@ -220,6 +234,11 @@ void Poisson::run()
   - solve the system
   - postprocessing and plotting
   */
+  make_grid();
+  setup_system();
+  assemble_system();
+  solve();
+  output_results();
 
  /* Bonus 2:
  Try to solve the problem for different mesh sizes by 
