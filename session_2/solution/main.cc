@@ -403,7 +403,7 @@ void Step_Heat<dim>::assemble_system() {
   VectorTools::interpolate_boundary_values(
       dof_handler, 0,
       // C) Homogeneous Dirichlet conditions:
-      ZeroFunction<dim>(),
+      Functions::ZeroFunction<dim>(),
       // Non-homogeneous Dirichlet conditions:
       // BoundaryValues<dim>(),
       boundary_values);
@@ -435,7 +435,7 @@ template <int dim>
 void Step_Heat<dim>::compute_functionals() {
   // Compute global L2 norm
   Vector<float> difference_per_cell(triangulation.n_active_cells());
-  VectorTools::integrate_difference(dof_handler, solution, ZeroFunction<dim>(),
+  VectorTools::integrate_difference(dof_handler, solution, Functions::ZeroFunction<dim>(),
                                     difference_per_cell, QGauss<dim>(4),
                                     VectorTools::L2_norm);
   const double L2_error = VectorTools::compute_global_error(

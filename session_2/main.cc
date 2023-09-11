@@ -118,7 +118,7 @@ class InitialValues : public Function<dim> {
 template <int dim>
 double InitialValues<dim>::value(const Point<dim> &p,
                                  const unsigned int component) const {
-  return /* MISSING CODE: Return initial condition*/
+  return /* MISSING CODE: Return initial condition*/(std::sin(p[0]) * std::sin(p[1]));
 }
 
 template <int dim>
@@ -263,12 +263,17 @@ void Step_Heat<dim>::setup_system() {
             << std::endl;
 
   /* MISSING CODE: Create sparsity pattern, cf. Session 1 */
+  DynamicSparsityPattern c_sparsity(dof_handler.n_dofs());
+  DoFTools::make_sparsity_pattern(dof_handler, c_sparsity);
+  sparsity_pattern.copy_from(c_sparsity);
 
   system_matrix.reinit(sparsity_pattern);
 
   /* MISSING CODE: Init rhs and solution vectors. 
   Note that in a time-dependent problem, also a vector for 
   the old solution is needed. */
+  old_timestep_solution.reinit(dof_handler.n_dofs());
+  system_rhs.reinit(dof_handler.n_dofs());
 }
 
 ///////////////////////////////////////////////////////////
@@ -280,6 +285,9 @@ void Step_Heat<dim>::assemble_system() {
   QGauss<dim> quadrature_formula(2);
 
   /* MISSING CODE: Get the fe_values: Which information is needed? */
+  FEValues<dim> fe_values(fe, quadrature_formula,
+                          update_values | update_gradients |
+                              update_quadrature_points | update_JxW_values);
 
   const unsigned int dofs_per_cell = fe.dofs_per_cell;
   const unsigned int n_q_points = quadrature_formula.size();
@@ -301,9 +309,9 @@ void Step_Heat<dim>::assemble_system() {
   /* BONUS 1: Initialize nonconstant coefficients by using Coefficient Class
   ToDo: Comment in the next three lines of code
   */
-  // // Class for nonconstant coefficients
-  // const Coefficient<dim> coefficient;
-  // std::vector<double> coefficient_values(n_q_points);
+  // Class for nonconstant coefficients
+  const Coefficient<dim> coefficient;
+  std::vector<double> coefficient_values(n_q_points);
 
   double density = 1.0;
 
@@ -349,15 +357,35 @@ void Step_Heat<dim>::assemble_system() {
           // function determines the row in system matrix A
 
           /* MISSING CODE: Add mass matrix contribution to cell matrix*/
+          cell_matrix(j, i) += density * (fe_values.shape_value(i, q_point) *
+                                          fe_values.shape_value(j, q_point) *
+                                          fe_values.JxW(q_point));
 
           /* MISSING CODE: Add stiffness matrix contribution to cell matrix */
+          cell_matrix(j, i) += timestep * theta *
+          (
+                  1.0 *
+                  fe_values.shape_grad(i, q_point) *
+                  fe_values.shape_grad(j, q_point) * fe_values.JxW(q_point));
           /* BONUS 1: Incorporate nonconstant diffusion coefficient by using the Coefficient class*/
         }
 
         /* MISSING CODE: Add rhs values contributions to cell rhs vector */
+                cell_rhs(i) +=
+            (fe_values.shape_value(i, q_point) *
+            0.0
+             ) *
+            fe_values.JxW(q_point);
         /* Bonus 2: Incorporate nonconstant rhs by RightHandSide class */
 
         /* MISSING CODE: Add old time step solution contributions to rhs */
+        cell_rhs(i) += 
+            (
+              old_timestep_u * fe_values.shape_value(i, q_point)
+              - timestep * (1.0 - theta) * 1.0 *
+            (old_timestep_grad_u * fe_values.shape_grad(i, q_point))
+            ) 
+            * fe_values.JxW(q_point);
       }
     }
 
@@ -378,7 +406,7 @@ void Step_Heat<dim>::assemble_system() {
   VectorTools::interpolate_boundary_values(
       dof_handler, 0,
       // C) Homogeneous Dirichlet conditions:
-      ZeroFunction<dim>(),
+      Functions::ZeroFunction<dim>(),
       // Non-homogeneous Dirichlet conditions:
       // BoundaryValues<dim>(),
       boundary_values);
@@ -410,7 +438,7 @@ template <int dim>
 void Step_Heat<dim>::compute_functionals() {
   // Compute global L2 norm
   Vector<float> difference_per_cell(triangulation.n_active_cells());
-  VectorTools::integrate_difference(dof_handler, solution, ZeroFunction<dim>(),
+  VectorTools::integrate_difference(dof_handler, solution, Functions::ZeroFunction<dim>(),
                                     difference_per_cell, QGauss<dim>(4),
                                     VectorTools::L2_norm);
   const double L2_error = VectorTools::compute_global_error(
@@ -465,6 +493,8 @@ void Step_Heat<dim>::run() {
             << std::endl;
 
   set_runtime_parameters();
+  make_grid();
+  setup_system();
 
   /* MISSING CODE: Grid generation + system setup */
 
@@ -502,7 +532,7 @@ void Step_Heat<dim>::run() {
 
     time += timestep;
     ++timestep_number;
-  } while (/* MISSING CODE: Stopping criterion*/);
+  } while (timestep_number <= max_no_timesteps/* MISSING CODE: Stopping criterion*/);
 }
 
 /////////////////////////////////////////////////////////
@@ -512,6 +542,8 @@ int main() {
 
   // initialize instance of 2d Step_Heat class and call run method
   /* MSSING CODE: See comment above*/
+  Step_Heat<2> laplace_problem_2d;
+  laplace_problem_2d.run();
 
   return 0;
 }
